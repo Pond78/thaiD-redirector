@@ -599,11 +599,10 @@
       };
 
       // Request back camera explicitly
-      // Request back camera with MAX Resolution (4K ideal) for Super Sharpness
+      // NOTE: Html5Qrcode.start throws error if config has > 1 key. 
+      // We must use only { facingMode: "environment" } here, and apply resolution constraints later.
       const cameraConfig = {
-        facingMode: "environment",
-        width: { min: 1280, ideal: 3840 },
-        height: { min: 720, ideal: 2160 }
+        facingMode: "environment"
       };
 
       html5QrcodeScanner.start(
@@ -612,31 +611,45 @@
         onScanSuccess,
         onScanFailure
       ).then(() => {
-        // Auto-zoom logic
+        // Apply Resolution & Auto-zoom logic after start
         setTimeout(() => {
           try {
-            const track = html5QrcodeScanner.getRunningTrackCameraCapabilities();
-            const zoomCapability = track.zoom;
+            // Maxwell Resolution Constraints (4K ideal)
+            const resolutionConstraints = {
+              width: { min: 1280, ideal: 3840 },
+              height: { min: 720, ideal: 2160 }
+            };
 
-            if (zoomCapability && zoomCapability.max > 1) {
+            // Get current capabilities for Zoom
+            const track = html5QrcodeScanner.getRunningTrackCameraCapabilities();
+            console.log("Camera Capabilities:", track);
+
+            let zoomConstraint = null;
+
+            if (track && track.zoom) {
+              const zoomCapability = track.zoom;
               // Target zoom level: 2.0x or Max if less than 2.0
               let targetZoom = Math.min(zoomCapability.max, 2.0);
 
-              // Ensure we don't go below min (usually 1)
               if (targetZoom < zoomCapability.min) {
                 targetZoom = zoomCapability.min;
               }
 
-              console.log(`Setting zoom to: ${targetZoom} (Min: ${zoomCapability.min}, Max: ${zoomCapability.max})`);
-
-              html5QrcodeScanner.applyVideoConstraints({
-                advanced: [{ zoom: targetZoom }]
-              });
-            } else {
-              console.log("Zoom not supported on this device/browser.");
+              console.log(`Setting Hardware Zoom to: ${targetZoom}`);
+              zoomConstraint = [{ zoom: targetZoom }];
             }
+
+            // Combine constraints
+            const finalConstraints = {
+              ...resolutionConstraints,
+              ...(zoomConstraint ? { advanced: zoomConstraint } : {})
+            };
+
+            console.log("Applying Constraints:", finalConstraints);
+            html5QrcodeScanner.applyVideoConstraints(finalConstraints);
+
           } catch (e) {
-            console.error("Error setting zoom:", e);
+            console.error("Error setting camera constraints:", e);
           }
         }, 500); // Slight delay to ensure camera is fully ready
       })
