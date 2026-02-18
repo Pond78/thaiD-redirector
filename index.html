@@ -386,17 +386,23 @@
       const matchStatus = document.getElementById('match-status');
       const scannedValue = document.getElementById('scanned-value');
 
-      // Strip specific prefixes (GS1-128 or scanner artifacts)
-      let cleanText = decodedText;
-      // Remove ]C10 or JC10 from the beginning
-      cleanText = cleanText.replace(/^(\]C10|JC10)/, '');
+      // Robust Extraction Logic:
+      // 1. Keep only digits
+      let rawDigits = decodedText.replace(/\D/g, '');
+      let code = rawDigits;
 
-      // Normalize text checks: Remove non-digits to match only numbers
-      let code = cleanText.replace(/\D/g, '');
-
-      // Specific fix: If code starts with '36811' (missing leading 0 due to stripping or printing), prepend '0'
-      if (code.startsWith('36811')) {
-        code = '0' + code;
+      // 2. Search for the specific order prefix '036811'
+      let matchIndex = rawDigits.indexOf('036811');
+      if (matchIndex !== -1) {
+        // Found '036811', valid order number starts here. Discard preceding digits.
+        code = rawDigits.substring(matchIndex);
+      } else {
+        // 3. Fallback: Check for '36811' (missing leading zero)
+        matchIndex = rawDigits.indexOf('36811');
+        if (matchIndex !== -1) {
+          // Found '36811', discard preceding and prepend '0'
+          code = '0' + rawDigits.substring(matchIndex);
+        }
       }
 
       // Update the display to show the ACTUAL used code (Full format: 036811...)
