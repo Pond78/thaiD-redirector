@@ -194,7 +194,16 @@
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       /* Shaded background */
       border-radius: 4px;
+      transition: box-shadow 0.3s ease, border 0.3s ease;
     }
+
+    .scan-area.error {
+      box-shadow: 0 0 0 9999px rgba(255, 0, 0, 0.5) !important;
+      /* Red overlay */
+      border: 4px solid #ff4444;
+    }
+
+    /* Corner Markers */
 
     /* Corner Markers */
     .corner {
@@ -521,9 +530,44 @@
         // matchStatus.textContent = 'ตรงกัน (MATCH)'; // Removed to keep UI clean or add back if needed
 
       } else {
-        // logic for non-match (optional based on prompt)
+        // Logic for non-match
+
+        // Visual Feedback: Red Overlay
+        const scanArea = document.querySelector('.scan-area');
+        if (scanArea) {
+          scanArea.classList.add('error');
+          setTimeout(() => scanArea.classList.remove('error'), 1000); // Remove after 1s
+        }
+
         resultDisplay.className = 'no-match';
-        matchStatus.textContent = 'ไม่พบข้อมูล';
+        matchStatus.style.display = 'block';
+        matchStatus.textContent = 'ไม่พบข้อมูล (ยังไม่จ่าย)';
+        matchStatus.style.color = 'red';
+        scannedValue.style.color = 'red';
+
+        // Audio Feedback: "Not Paid"
+        setTimeout(() => {
+          playBeep('scan'); // Optional: distinct fail beep? For now standard beep.
+          speakNotPaid();
+        }, 300);
+      }
+    }
+
+    function speakPaid() {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance("จ่ายแล้ว");
+        utterance.lang = 'th-TH';
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function speakNotPaid() {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance("ยังไม่จ่าย"); // Not Paid
+        utterance.lang = 'th-TH';
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
       }
     }
 
