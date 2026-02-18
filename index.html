@@ -88,8 +88,10 @@
     }
 
     #result-display {
-      margin-top: 20px;
-      padding: 20px;
+      /* margin-top: 20px;  Removed as it is now above camera */
+      background-color: #fff;
+      /* Ensure visibility */
+      border: 1px solid #ddd;
       border-radius: 12px;
       display: none;
     }
@@ -186,11 +188,12 @@
         ตรวจพบแล้ว: <span id="found-count">0</span> / <span id="total-count">0</span>
       </div>
 
-      <div id="reader"></div>
-      <div id="result-display">
+      <div id="result-display" style="display: none; margin-bottom: 15px; padding: 15px;">
         <span class="result-text" id="match-status"></span>
         <span class="scanned-code" id="scanned-value"></span>
       </div>
+
+      <div id="reader"></div>
 
       <div style="margin-top: 20px; text-align: left;">
         <h3 style="font-size: 1rem; margin-bottom: 5px;">รายการที่ตรวจพบ (<span id="scanned-list-count">0</span>):</h3>
