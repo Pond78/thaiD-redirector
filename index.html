@@ -81,38 +81,83 @@
       /* Hidden until data loaded */
     }
 
-    /* Scanner wrapper: locks aspect ratio, clips overflow */
+    /* Scanner wrapper: visual container, clips overflow */
     #scanner-wrapper {
       position: relative;
       width: 100%;
-      aspect-ratio: 4 / 3;
       overflow: hidden;
       margin: 0 auto;
       background: #000;
       border-radius: 8px;
     }
 
-    /* #reader fills the wrapper fully */
+    /* #reader: normal block so html5-qrcode can measure it */
     #reader {
-      position: absolute;
-      top: 0;
-      left: 0;
       width: 100%;
-      height: 100%;
-      overflow: hidden;
+      display: block;
     }
 
-    /* Video element: fill and center inside #reader */
+    /* Hide html5-qrcode's own UI controls (shutter button etc.) */
+    #reader__dashboard_section_swaplink,
+    #reader__dashboard_section_csr,
+    #reader__filescan_input {
+      display: none !important;
+    }
+
+    /* Video element: fill reader width, crop height via wrapper */
     #reader video {
-      position: absolute !important;
-      top: 50% !important;
-      left: 50% !important;
-      transform: translate(-50%, -50%) !important;
       width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-      min-width: 100%;
-      min-height: 100%;
+      max-width: 100% !important;
+      display: block;
+    }
+
+    /* Scan result bar below camera */
+    #scan-result-bar {
+      margin-top: 8px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      text-align: center;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    #scan-result-bar.match {
+      background: #d4edda;
+      border: 2px solid #28a745;
+    }
+
+    #scan-result-bar.no-match {
+      background: #f8d7da;
+      border: 2px solid #dc3545;
+    }
+
+    #scan-result-label {
+      display: block;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    #scan-result-bar.match #scan-result-label {
+      color: #155724;
+    }
+
+    #scan-result-bar.no-match #scan-result-label {
+      color: #721c24;
+    }
+
+    #scan-result-code {
+      display: block;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    #scan-result-bar.match #scan-result-code {
+      color: #155724;
+    }
+
+    #scan-result-bar.no-match #scan-result-code {
+      color: #dc3545;
     }
 
     /* Summary Modal */
@@ -296,9 +341,21 @@
     }
 
     .scan-area.error {
-      box-shadow: 0 0 0 9999px rgba(255, 0, 0, 0.5) !important;
-      /* Red overlay */
-      border: 4px solid #ff4444;
+      box-shadow: 0 0 0 9999px rgba(180, 0, 0, 0.45) !important;
+      border: 3px solid #ff4444;
+    }
+
+    .scan-area.error .corner {
+      border-color: #ff4444;
+    }
+
+    .scan-area.success {
+      box-shadow: 0 0 0 9999px rgba(0, 120, 0, 0.35) !important;
+      border: 3px solid #28a745;
+    }
+
+    .scan-area.success .corner {
+      border-color: #28a745;
     }
 
     /* Corner Markers */
@@ -379,11 +436,10 @@
         </div>
       </div>
 
-      <div id="result-display"
-        style="display: none; margin-top: 20px; padding: 10px; border: none; background: transparent;">
-        <span class="result-text" id="match-status" style="display: none;"></span>
-        <span class="scanned-code" id="scanned-value"
-          style="font-size: 2.5rem; font-weight: 900; color: #000; display: block; text-shadow: 1px 1px 2px white;"></span>
+      <!-- Scan result bar: shown below camera frame -->
+      <div id="scan-result-bar" style="display:none;">
+        <span id="scan-result-label"></span>
+        <span id="scan-result-code"></span>
       </div>
 
       <div style="margin-top: 20px; text-align: left;">
@@ -428,7 +484,8 @@
 
   <script>
     let orderNumbers = new Set();
-    let scannedOrders = new Set();
+    let scannedOrders = new Set();     // จ่ายแล้ว (match)
+    let notPaidScanned = new Set();    // สแกนแล้วไม่พบ (ยังไม่จ่าย)
     let html5QrcodeScanner = null;
     let audioContext = null;
 
@@ -550,8 +607,9 @@
         statusDiv.textContent = `พบข้อมูลใบสั่ง ${count} รายการ`;
         statusDiv.style.color = 'green';
 
-        // Reset scanned set and update display
+        // Reset scanned sets and update display
         scannedOrders.clear();
+        notPaidScanned.clear();
         document.getElementById('total-count').textContent = count;
         document.getElementById('found-count').textContent = '0';
         document.getElementById('scanned-list-count').textContent = '0';
@@ -632,10 +690,6 @@
       // Play "Scan" beep for every valid scan
       playBeep('scan');
 
-      const resultDisplay = document.getElementById('result-display');
-      const matchStatus = document.getElementById('match-status');
-      const scannedValue = document.getElementById('scanned-value');
-
       // Robust Extraction Logic:
       // 1. Keep only digits
       let rawDigits = decodedText.replace(/\D/g, '');
@@ -644,20 +698,14 @@
       // 2. Search for the specific order prefix '036811'
       let matchIndex = rawDigits.indexOf('036811');
       if (matchIndex !== -1) {
-        // Found '036811', valid order number starts here. Discard preceding digits.
         code = rawDigits.substring(matchIndex);
       } else {
         // 3. Fallback: Check for '36811' (missing leading zero)
         matchIndex = rawDigits.indexOf('36811');
         if (matchIndex !== -1) {
-          // Found '36811', discard preceding and prepend '0'
           code = '0' + rawDigits.substring(matchIndex);
         }
       }
-
-      // Update the display to show only the ACTUAL used code (Full format: 036811...)
-      // User requested to show just the number
-      scannedValue.textContent = `${code}`;
 
       if (orderNumbers.has(code)) {
         // Match found
@@ -672,47 +720,63 @@
             scannedList.innerHTML = ''; // Clear "no items" message
           }
           const li = document.createElement('li');
-          li.textContent = `${code}`;
+          li.textContent = code;
           li.style.color = 'green';
           li.style.fontWeight = 'bold';
-
-          // Prepend used for latest on top, or append for chronological
           scannedList.insertBefore(li, scannedList.firstChild);
         }
 
-        // Reset zoom after successful scan (ready for next barcode)
+        // Reset zoom after successful scan
         resetZoom();
 
-        // Delay "Paid" voice slightly so it doesn't clash with the beep
+        // Voice + beep
         setTimeout(() => {
           playBeep('success');
           speakPaid();
         }, 300);
 
-        resultDisplay.className = 'match';
-        // matchStatus.textContent = 'ตรงกัน (MATCH)'; // Removed to keep UI clean or add back if needed
+        // Show GREEN result bar
+        showResultBar('match', '✅ จ่ายแล้ว', code);
 
       } else {
-        // Logic for non-match
+        // Non-match
+        notPaidScanned.add(code);
 
-        // Visual Feedback: Red Overlay
+        // Red overlay on scan frame
         const scanArea = document.querySelector('.scan-area');
         if (scanArea) {
           scanArea.classList.add('error');
-          setTimeout(() => scanArea.classList.remove('error'), 1000); // Remove after 1s
+          setTimeout(() => scanArea.classList.remove('error'), 1000);
         }
 
-        resultDisplay.className = 'no-match';
-        matchStatus.style.display = 'block';
-        matchStatus.textContent = 'ไม่พบข้อมูล (ยังไม่จ่าย)';
-        matchStatus.style.color = 'red';
-        scannedValue.style.color = 'red';
-
-        // Audio Feedback: "Not Paid"
+        // Voice + beep
         setTimeout(() => {
-          playBeep('scan'); // Optional: distinct fail beep? For now standard beep.
+          playBeep('scan');
           speakNotPaid();
         }, 300);
+
+        // Show RED result bar
+        showResultBar('no-match', '❌ ยังไม่จ่าย', code);
+      }
+    }
+
+    function showResultBar(type, label, code) {
+      // Update result bar below camera
+      const bar = document.getElementById('scan-result-bar');
+      document.getElementById('scan-result-label').textContent = label;
+      document.getElementById('scan-result-code').textContent = code;
+      bar.className = type;
+      bar.style.display = 'block';
+
+      // Update scan-area frame color
+      const scanArea = document.querySelector('.scan-area');
+      if (scanArea) {
+        scanArea.classList.remove('success', 'error');
+        scanArea.classList.add(type === 'match' ? 'success' : 'error');
+        // Reset frame color after 2s
+        setTimeout(() => {
+          scanArea.classList.remove('success', 'error');
+        }, 2000);
       }
     }
 
@@ -760,10 +824,14 @@
         html5QrcodeScanner = new Html5Qrcode("reader");
       }
 
+      const readerEl = document.getElementById('reader');
+      const readerWidth = readerEl.offsetWidth || 320;
+      const boxW = Math.min(260, Math.round(readerWidth * 0.8));
+      const boxH = Math.round(boxW * 0.5);
+
       const config = {
         fps: 10,
-        qrbox: { width: 250, height: 150 }
-        // aspectRatio: 1.0 // Removed to allow CSS to handle shaping/cropping
+        qrbox: { width: boxW, height: boxH }
       };
 
       // Request back camera explicitly
@@ -831,9 +899,9 @@
     }
 
     function showSummary() {
-      const total = orderNumbers.size;
       const paid = scannedOrders.size;
-      const unpaid = total - paid;
+      const unpaid = notPaidScanned.size;
+      const total = paid + unpaid;
       document.getElementById('sum-total').textContent = total;
       document.getElementById('sum-paid').textContent = paid;
       document.getElementById('sum-unpaid').textContent = unpaid;
@@ -850,7 +918,7 @@
           html5QrcodeScanner.clear();
           document.getElementById('input-section').style.display = 'block';
           document.getElementById('scanner-container').style.display = 'none';
-          document.getElementById('result-display').style.display = 'none';
+          document.getElementById('scan-result-bar').style.display = 'none';
           showSummary();
           console.log("Scanner stopped.");
         }).catch(error => {
