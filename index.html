@@ -188,12 +188,14 @@
         ตรวจพบแล้ว: <span id="found-count">0</span> / <span id="total-count">0</span>
       </div>
 
-      <div id="result-display" style="display: none; margin-bottom: 15px; padding: 15px;">
-        <span class="result-text" id="match-status"></span>
-        <span class="scanned-code" id="scanned-value"></span>
-      </div>
-
       <div id="reader"></div>
+
+      <div id="result-display"
+        style="display: none; margin-top: 20px; padding: 10px; border: none; background: transparent;">
+        <span class="result-text" id="match-status" style="display: none;"></span>
+        <span class="scanned-code" id="scanned-value"
+          style="font-size: 2.5rem; font-weight: 900; color: #000; display: block; text-shadow: 1px 1px 2px white;"></span>
+      </div>
 
       <div style="margin-top: 20px; text-align: left;">
         <h3 style="font-size: 1rem; margin-bottom: 5px;">รายการที่ตรวจพบ (<span id="scanned-list-count">0</span>):</h3>
@@ -476,7 +478,7 @@
 
       const config = {
         fps: 10,
-        qrbox: { width: 250, height: 250 },
+        qrbox: { width: 250, height: 150 },
         aspectRatio: 1.0
       };
 
