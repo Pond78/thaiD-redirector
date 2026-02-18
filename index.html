@@ -555,8 +555,15 @@
       };
 
       // Request back camera explicitly
+      // Request back camera with High Resolution (1080p ideal) for better digital zoom/clarity
+      const cameraConfig = {
+        facingMode: "environment",
+        width: { min: 1280, ideal: 1920 },
+        height: { min: 720, ideal: 1080 }
+      };
+
       html5QrcodeScanner.start(
-        { facingMode: "environment" },
+        cameraConfig,
         config,
         onScanSuccess,
         onScanFailure
