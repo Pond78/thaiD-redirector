@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Barcode Scanner</title>
+  <!-- Include html5-qrcode library -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f0f2f5;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #input-section {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+
+    button:active {
+      background-color: #0056b3;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+    }
+
+    #status {
+      margin: 10px 0;
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    #scanner-container {
+      margin-top: 20px;
+      display: none;
+      /* Hidden until data loaded */
+    }
+
+    #reader {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #result-display {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    .match {
+      background-color: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+      animation: pulse 0.5s ease-in-out;
+    }
+
+    .no-match {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+
+    .result-text {
+      font-size: 2rem;
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .scanned-code {
+      font-size: 1.2rem;
+      color: #555;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+
+      .container {
+        padding: 15px;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+      }
+    }
+
+    .count-badge {
+      background: #eee;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h1>ตรวจสอบใบสั่ง (Mobile Scanner)</h1>
+
+    <div id="input-section">
+      <p style="margin-top: 0; text-align: left; font-size: 0.9rem; color: #666;">
+        1. วางโค้ด HTML ที่มีตารางใบสั่งลงในช่องด้านล่าง<br>
+        2. กดปุ่ม "ดึงข้อมูล & เริ่มสแกน"
+      </p>
+      <textarea id="htmlInput" placeholder="วางโค้ด HTML <tbody>...</tbody> ที่นี่"></textarea>
+      <button onclick="startScanner()">ดึงข้อมูล & เปิดกล้อง</button>
+      <div id="data-status" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+
+    <div id="scanner-container">
+      <div id="reader"></div>
+      <div id="result-display">
+        <span class="result-text" id="match-status"></span>
+        <span class="scanned-code" id="scanned-value"></span>
+      </div>
+      <button onclick="stopScanner()" style="margin-top: 20px; background-color: #dc3545;">หยุดสแกน</button>
+    </div>
+  </div>
+
+  <script>
+    let orderNumbers = new Set();
+    let html5QrcodeScanner = null;
+    let audioContext = null;
+
+    // Initialize Audio Context on user interaction
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+
+    function playBeep(type) {
+      if (!audioContext) initAudio();
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      if (type === 'success') {
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } else {
+        // Optional: Error beep
+      }
+    }
+
+    function parseOrderNumbers() {
+      const input = document.getElementById('htmlInput').value.trim();
+      if (!input) {
+        alert("กรุณาวางโค้ด HTML ก่อน");
+        return false;
+      }
+
+      // Create a dummy element to parse HTML safely
+      // Wrap in table to ensure tbody/tr are preserved if missing parent tags
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = '<table>' + input + '</table>';
+
+      // Find rows within the constructed table
+      const rows = tempDiv.querySelectorAll('tr');
+
+      orderNumbers.clear();
+      let count = 0;
+
+      rows.forEach(row => {
+        // Target: First <td> in the row
+        const firstTd = row.querySelector('td');
+        if (firstTd) {
+          const text = firstTd.textContent.trim();
+          // specific check for length to avoid empty cells or headers if any
+          if (text && text.length > 5) {
+            orderNumbers.add(text);
+            count++;
+          }
+        }
+      });
+
+      const statusDiv = document.getElementById('data-status');
+      if (count > 0) {
+        statusDiv.textContent = `พบข้อมูลใบสั่ง ${count} รายการ`;
+        statusDiv.style.color = 'green';
+        return true;
+      } else {
+        // Fallback: Check if user pasted just text or something else
+        statusDiv.textContent = "ไม่พบข้อมูลใบสั่งใน HTML ที่วาง (กรุณาวางโค้ดที่มี <tr>...</tr>)";
+        statusDiv.style.color = 'red';
+        return false;
+      }
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+      // Handle on success condition with the decoded message.
+      console.log(`Scan result: ${decodedText}`, decodedResult);
+
+      const resultDisplay = document.getElementById('result-display');
+      const matchStatus = document.getElementById('match-status');
+      const scannedValue = document.getElementById('scanned-value');
+
+      resultDisplay.style.display = 'block';
+      scannedValue.textContent = `เลขที่สแกน: ${decodedText}`;
+
+      // Normalize text checks (trim)
+      const code = decodedText.trim();
+
+      if (orderNumbers.has(code)) {
+        // Match found
+        playBeep('success');
+
+        resultDisplay.className = 'match';
+        matchStatus.textContent = 'ตรงกัน (MATCH)';
+
+        // Optional: clear after a few seconds to allow next scan visual input
+        // But user might want to see it. 
+        // We'll keep it until next scan replaces it.
+      } else {
+        // logic for non-match (optional based on prompt)
+        resultDisplay.className = 'no-match';
+        matchStatus.textContent = 'ไม่พบข้อมูล';
+      }
+    }
+
+    function onScanFailure(error) {
+      // handle scan failure, usually better to ignore and keep scanning.
+      // for example:
+      // console.warn(`Code scan error = ${error}`);
+    }
+
+    function startScanner() {
+      if (!parseOrderNumbers()) return;
+
+      // Hide input, show scanner
+      document.getElementById('input-section').style.display = 'none';
+      document.getElementById('scanner-container').style.display = 'block';
+
+      // Initialize Audio
+      initAudio();
+
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5QrcodeScanner(
+          "reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            showTorchButtonIfSupported: true
+          },
+                /* verbose= */ false
+        );
+      }
+
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function stopScanner() {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().then(_ => {
+          document.getElementById('input-section').style.display = 'block';
+          document.getElementById('scanner-container').style.display = 'none';
+          document.getElementById('result-display').style.display = 'none';
+          console.log("Scanner stopped.");
+        }).catch(error => {
+          console.error("Failed to clear scanner. ", error);
+        });
+      }
+    }
+  </script>
+
+</body>
+
+</html>
