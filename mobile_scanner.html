@@ -220,6 +220,14 @@
       }
     }
 
+    function speakPaid() {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance("จ่ายแล้ว");
+        utterance.lang = 'th-TH';
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
     function playBeep(type) {
       if (!audioContext) initAudio();
 
@@ -318,8 +326,8 @@
       resultDisplay.style.display = 'block';
       scannedValue.textContent = `เลขที่สแกน: ${decodedText}`;
 
-      // Normalize text checks (trim)
-      const code = decodedText.trim();
+      // Normalize text checks: Remove non-digits to match only numbers
+      const code = decodedText.replace(/\D/g, '');
 
       if (orderNumbers.has(code)) {
         // Match found
@@ -334,7 +342,7 @@
             scannedList.innerHTML = ''; // Clear "no items" message
           }
           const li = document.createElement('li');
-          li.textContent = code;
+          li.textContent = `${code} (จาก ${decodedText})`;
           li.style.color = 'green';
           li.style.fontWeight = 'bold';
 
@@ -343,6 +351,7 @@
         }
 
         playBeep('success');
+        speakPaid(); // Voice alert
 
         resultDisplay.className = 'match';
 
