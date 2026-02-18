@@ -177,11 +177,29 @@
       <div id="count-display" style="font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; color: #333;">
         ตรวจพบแล้ว: <span id="found-count">0</span> / <span id="total-count">0</span>
       </div>
+
       <div id="reader"></div>
       <div id="result-display">
         <span class="result-text" id="match-status"></span>
         <span class="scanned-code" id="scanned-value"></span>
       </div>
+
+      <div style="margin-top: 20px; text-align: left;">
+        <h3 style="font-size: 1rem; margin-bottom: 5px;">รายการที่ตรวจพบ (<span id="scanned-list-count">0</span>):</h3>
+        <ul id="scanned-list"
+          style="max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #ddd; list-style-position: inside;">
+          <li style="color: #999;">ยังไม่มีรายการ</li>
+        </ul>
+
+        <details style="margin-top: 15px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
+          <summary style="cursor: pointer; font-weight: bold; color: #007bff;">ดูรายการใบสั่งทั้งหมด (<span
+              id="all-list-count">0</span>)</summary>
+          <ul id="all-target-list" style="max-height: 200px; overflow-y: auto; margin-top: 10px; padding-left: 20px;">
+            <!-- Populated by JS -->
+          </ul>
+        </details>
+      </div>
+
       <button onclick="stopScanner()" style="margin-top: 20px; background-color: #dc3545;">หยุดสแกน</button>
     </div>
   </div>
@@ -264,6 +282,21 @@
         scannedOrders.clear();
         document.getElementById('total-count').textContent = count;
         document.getElementById('found-count').textContent = '0';
+        document.getElementById('scanned-list-count').textContent = '0';
+        document.getElementById('all-list-count').textContent = count;
+
+        // Populate All Targets List
+        const allList = document.getElementById('all-target-list');
+        allList.innerHTML = '';
+        orderNumbers.forEach(num => {
+          const li = document.createElement('li');
+          li.textContent = num;
+          allList.appendChild(li);
+        });
+
+        // Reset Scanned List
+        const scannedList = document.getElementById('scanned-list');
+        scannedList.innerHTML = '<li style="color: #999;">ยังไม่มีรายการ</li>';
 
         return true;
       } else {
@@ -293,12 +326,25 @@
         if (!scannedOrders.has(code)) {
           scannedOrders.add(code);
           document.getElementById('found-count').textContent = scannedOrders.size;
+          document.getElementById('scanned-list-count').textContent = scannedOrders.size;
+
+          // Update Scanned List UI
+          const scannedList = document.getElementById('scanned-list');
+          if (scannedOrders.size === 1) {
+            scannedList.innerHTML = ''; // Clear "no items" message
+          }
+          const li = document.createElement('li');
+          li.textContent = code;
+          li.style.color = 'green';
+          li.style.fontWeight = 'bold';
+
+          // Prepend used for latest on top, or append for chronological
+          scannedList.insertBefore(li, scannedList.firstChild);
         }
 
         playBeep('success');
 
         resultDisplay.className = 'match';
-        matchStatus.textContent = 'ตรงกัน (MATCH)';
 
         // Optional: clear after a few seconds to allow next scan visual input
         // But user might want to see it. 
