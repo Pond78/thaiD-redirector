@@ -399,8 +399,14 @@
         code = '0' + code;
       }
 
-      // Update the display to show the ACTUAL used code, not just the raw scan
-      scannedValue.textContent = `เลขที่สแกน: ${code}`;
+      // Create a display version that hides the common prefix '036811'
+      let displayCode = code;
+      if (displayCode.startsWith('036811')) {
+        displayCode = displayCode.substring(6);
+      }
+
+      // Update the display to show the SHORTENED code
+      scannedValue.textContent = `เลขที่สแกน: ${displayCode}`;
 
       if (orderNumbers.has(code)) {
         // Match found
@@ -415,7 +421,8 @@
             scannedList.innerHTML = ''; // Clear "no items" message
           }
           const li = document.createElement('li');
-          li.textContent = `${code} (จาก ${decodedText})`;
+          // Show shortened code in list too
+          li.textContent = `${displayCode}`;
           li.style.color = 'green';
           li.style.fontWeight = 'bold';
 
