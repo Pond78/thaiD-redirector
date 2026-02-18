@@ -560,13 +560,42 @@
         config,
         onScanSuccess,
         onScanFailure
-      ).catch(err => {
-        console.error("Error starting scanner", err);
-        alert("ไม่สามารถเปิดกล้องได้: " + err);
-        // Fallback to stop/reset UI
-        document.getElementById('input-section').style.display = 'block';
-        document.getElementById('scanner-container').style.display = 'none';
-      });
+      ).then(() => {
+        // Auto-zoom logic
+        setTimeout(() => {
+          try {
+            const track = html5QrcodeScanner.getRunningTrackCameraCapabilities();
+            const zoomCapability = track.zoom;
+
+            if (zoomCapability && zoomCapability.max > 1) {
+              // Target zoom level: 2.0x or Max if less than 2.0
+              let targetZoom = Math.min(zoomCapability.max, 2.0);
+
+              // Ensure we don't go below min (usually 1)
+              if (targetZoom < zoomCapability.min) {
+                targetZoom = zoomCapability.min;
+              }
+
+              console.log(`Setting zoom to: ${targetZoom} (Min: ${zoomCapability.min}, Max: ${zoomCapability.max})`);
+
+              html5QrcodeScanner.applyVideoConstraints({
+                advanced: [{ zoom: targetZoom }]
+              });
+            } else {
+              console.log("Zoom not supported on this device/browser.");
+            }
+          } catch (e) {
+            console.error("Error setting zoom:", e);
+          }
+        }, 500); // Slight delay to ensure camera is fully ready
+      })
+        .catch(err => {
+          console.error("Error starting scanner", err);
+          alert("ไม่สามารถเปิดกล้องได้: " + err);
+          // Fallback to stop/reset UI
+          document.getElementById('input-section').style.display = 'block';
+          document.getElementById('scanner-container').style.display = 'none';
+        });
     }
 
     function stopScanner() {
