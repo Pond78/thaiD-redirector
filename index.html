@@ -248,7 +248,7 @@
 <body>
 
   <div class="container">
-    <h1>ตรวจสอบใบสั่ง (Mobile Scanner)</h1>
+    <h1>ตรวจสอบใบสั่ง (v2.0 Fixed)</h1>
 
     <div id="input-section">
       <p style="margin-top: 0; text-align: left; font-size: 0.9rem; color: #666;">
@@ -655,7 +655,16 @@
       })
         .catch(err => {
           console.error("Error starting scanner", err);
-          alert("ไม่สามารถเปิดกล้องได้: " + err);
+          const debugKeys = Object.keys(cameraConfig).join(', ');
+          alert(`[v2.1 Debug] Keys: ${debugKeys}\nError: ${err}`);
+
+          // Fallback: If 1 key failed, try empty config (any camera)
+          if (Object.keys(cameraConfig).length > 0) {
+            console.log("Retrying with empty config...");
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+              .catch(e => alert("Retry Failed: " + e));
+          }
+
           // Fallback to stop/reset UI
           document.getElementById('input-section').style.display = 'block';
           document.getElementById('scanner-container').style.display = 'none';
