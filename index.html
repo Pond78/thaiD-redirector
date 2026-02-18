@@ -555,11 +555,11 @@
       };
 
       // Request back camera explicitly
-      // Request back camera with High Resolution (1080p ideal) for better digital zoom/clarity
+      // Request back camera with MAX Resolution (4K ideal) for Super Sharpness
       const cameraConfig = {
         facingMode: "environment",
-        width: { min: 1280, ideal: 1920 },
-        height: { min: 720, ideal: 1080 }
+        width: { min: 1280, ideal: 3840 },
+        height: { min: 720, ideal: 2160 }
       };
 
       html5QrcodeScanner.start(
