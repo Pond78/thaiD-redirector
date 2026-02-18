@@ -386,16 +386,21 @@
       const matchStatus = document.getElementById('match-status');
       const scannedValue = document.getElementById('scanned-value');
 
-      resultDisplay.style.display = 'block';
-      scannedValue.textContent = `เลขที่สแกน: ${decodedText}`;
-
       // Strip specific prefixes (GS1-128 or scanner artifacts)
       let cleanText = decodedText;
       // Remove ]C10 or JC10 from the beginning
       cleanText = cleanText.replace(/^(\]C10|JC10)/, '');
 
       // Normalize text checks: Remove non-digits to match only numbers
-      const code = cleanText.replace(/\D/g, '');
+      let code = cleanText.replace(/\D/g, '');
+
+      // Specific fix: If code starts with '36811' (missing leading 0 due to stripping or printing), prepend '0'
+      if (code.startsWith('36811')) {
+        code = '0' + code;
+      }
+
+      // Update the display to show the ACTUAL used code, not just the raw scan
+      scannedValue.textContent = `เลขที่สแกน: ${code}`;
 
       if (orderNumbers.has(code)) {
         // Match found
