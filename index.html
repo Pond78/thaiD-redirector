@@ -81,10 +81,11 @@
       /* Hidden until data loaded */
     }
 
-    /* Scanner wrapper: visual container, clips overflow */
+    /* Scanner wrapper: fixed height, clips overflow */
     #scanner-wrapper {
       position: relative;
       width: 100%;
+      max-height: 260px;
       overflow: hidden;
       margin: 0 auto;
       background: #000;
@@ -97,14 +98,25 @@
       display: block;
     }
 
-    /* Hide html5-qrcode's own UI controls (shutter button etc.) */
+    /* Hide html5-qrcode's own UI: qrbox border, shutter, controls */
+    #reader__scan_region {
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    #reader__scan_region img,
+    #reader__scan_region svg {
+      display: none !important;
+    }
+
+    #reader__dashboard,
     #reader__dashboard_section_swaplink,
     #reader__dashboard_section_csr,
     #reader__filescan_input {
       display: none !important;
     }
 
-    /* Video element: fill reader width, crop height via wrapper */
+    /* Video element: fill reader width */
     #reader video {
       width: 100% !important;
       max-width: 100% !important;
@@ -824,14 +836,9 @@
         html5QrcodeScanner = new Html5Qrcode("reader");
       }
 
-      const readerEl = document.getElementById('reader');
-      const readerWidth = readerEl.offsetWidth || 320;
-      const boxW = Math.min(260, Math.round(readerWidth * 0.8));
-      const boxH = Math.round(boxW * 0.5);
-
       const config = {
-        fps: 10,
-        qrbox: { width: boxW, height: boxH }
+        fps: 10
+        // No qrbox: library scans full frame, our overlay provides the visual guide
       };
 
       // Request back camera explicitly
