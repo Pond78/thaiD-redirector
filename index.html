@@ -81,10 +81,115 @@
       /* Hidden until data loaded */
     }
 
-    #reader {
+    /* Scanner wrapper: locks aspect ratio, clips overflow */
+    #scanner-wrapper {
+      position: relative;
       width: 100%;
-      border-radius: 8px;
+      aspect-ratio: 4 / 3;
       overflow: hidden;
+      margin: 0 auto;
+      background: #000;
+      border-radius: 8px;
+    }
+
+    /* #reader fills the wrapper fully */
+    #reader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Video element: fill and center inside #reader */
+    #reader video {
+      position: absolute !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      min-width: 100%;
+      min-height: 100%;
+    }
+
+    /* Summary Modal */
+    #summary-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #summary-modal.show {
+      display: flex;
+    }
+
+    .summary-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 32px;
+      text-align: center;
+      min-width: 260px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    .summary-box h2 {
+      margin: 0 0 18px;
+      font-size: 1.3rem;
+      color: #333;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.1rem;
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .summary-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .summary-row .label {
+      color: #555;
+    }
+
+    .summary-row .value {
+      font-weight: bold;
+    }
+
+    .val-total {
+      color: #333;
+    }
+
+    .val-paid {
+      color: #28a745;
+    }
+
+    .val-unpaid {
+      color: #dc3545;
+    }
+
+    .summary-close {
+      margin-top: 20px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 32px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      width: auto;
     }
 
     #result-display {
@@ -163,13 +268,6 @@
     }
 
     /* Scanner Overlay Styles */
-    #scanner-wrapper {
-      position: relative;
-      width: 100%;
-      max-width: 100%;
-      overflow: hidden;
-      margin: 0 auto;
-    }
 
     #scan-overlay {
       position: absolute;
@@ -269,7 +367,17 @@
         ตรวจพบแล้ว: <span id="found-count">0</span> / <span id="total-count">0</span>
       </div>
 
-      <div id="reader"></div>
+      <div id="scanner-wrapper">
+        <div id="reader"></div>
+        <div id="scan-overlay">
+          <div class="scan-area">
+            <div class="corner top-left"></div>
+            <div class="corner top-right"></div>
+            <div class="corner bottom-left"></div>
+            <div class="corner bottom-right"></div>
+          </div>
+        </div>
+      </div>
 
       <div id="result-display"
         style="display: none; margin-top: 20px; padding: 10px; border: none; background: transparent;">
@@ -295,6 +403,26 @@
       </div>
 
       <button onclick="stopScanner()" style="margin-top: 20px; background-color: #dc3545;">หยุดสแกน</button>
+    </div>
+  </div>
+
+  <!-- Summary Modal -->
+  <div id="summary-modal">
+    <div class="summary-box">
+      <h2>📋 สรุปผลการตรวจสอบ</h2>
+      <div class="summary-row">
+        <span class="label">ใบสั่งทั้งหมด</span>
+        <span class="value val-total" id="sum-total">0</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">✅ จ่ายแล้ว</span>
+        <span class="value val-paid" id="sum-paid">0</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">❌ ยังไม่จ่าย</span>
+        <span class="value val-unpaid" id="sum-unpaid">0</span>
+      </div>
+      <button class="summary-close" onclick="closeSummary()">ปิด</button>
     </div>
   </div>
 
@@ -453,6 +581,38 @@
 
     let lastScannedCode = null;
     let lastScanTime = 0;
+    let isZoomed = false;
+    let zoomDetectionTimer = null;
+
+    // Auto-zoom in when barcode candidate detected (called from onScanFailure with partial detection)
+    function handleAutoZoom() {
+      if (isZoomed || !html5QrcodeScanner) return;
+      try {
+        const track = html5QrcodeScanner.getRunningTrackCameraCapabilities();
+        if (!track || !track.zoom) return;
+        const zoomCap = track.zoom;
+        const targetZoom = Math.min(zoomCap.min + 2.5, zoomCap.max);
+        html5QrcodeScanner.applyVideoConstraints({ advanced: [{ zoom: targetZoom }] });
+        isZoomed = true;
+        console.log('Auto Zoom IN to:', targetZoom);
+      } catch (e) {
+        console.warn('Auto zoom error:', e);
+      }
+    }
+
+    // Reset zoom back to 1.0 after successful scan
+    function resetZoom() {
+      if (!isZoomed || !html5QrcodeScanner) return;
+      try {
+        const track = html5QrcodeScanner.getRunningTrackCameraCapabilities();
+        if (!track || !track.zoom) return;
+        html5QrcodeScanner.applyVideoConstraints({ advanced: [{ zoom: 1.0 }] });
+        isZoomed = false;
+        console.log('Auto Zoom RESET to 1.0');
+      } catch (e) {
+        console.warn('Reset zoom error:', e);
+      }
+    }
 
     function onScanSuccess(decodedText, decodedResult) {
       // Handle on success condition with the decoded message.
@@ -520,6 +680,9 @@
           scannedList.insertBefore(li, scannedList.firstChild);
         }
 
+        // Reset zoom after successful scan (ready for next barcode)
+        resetZoom();
+
         // Delay "Paid" voice slightly so it doesn't clash with the beep
         setTimeout(() => {
           playBeep('success');
@@ -572,9 +735,14 @@
     }
 
     function onScanFailure(error) {
-      // handle scan failure, usually better to ignore and keep scanning.
-      // for example:
-      // console.warn(`Code scan error = ${error}`);
+      // When scan fails (no barcode yet), trigger auto-zoom with a 100ms buffer
+      // to avoid jitter from rapid zoom in/out
+      if (!isZoomed) {
+        clearTimeout(zoomDetectionTimer);
+        zoomDetectionTimer = setTimeout(() => {
+          handleAutoZoom();
+        }, 100);
+      }
     }
 
     function startScanner() {
@@ -662,6 +830,20 @@
         });
     }
 
+    function showSummary() {
+      const total = orderNumbers.size;
+      const paid = scannedOrders.size;
+      const unpaid = total - paid;
+      document.getElementById('sum-total').textContent = total;
+      document.getElementById('sum-paid').textContent = paid;
+      document.getElementById('sum-unpaid').textContent = unpaid;
+      document.getElementById('summary-modal').classList.add('show');
+    }
+
+    function closeSummary() {
+      document.getElementById('summary-modal').classList.remove('show');
+    }
+
     function stopScanner() {
       if (html5QrcodeScanner) {
         html5QrcodeScanner.stop().then(() => {
@@ -669,12 +851,13 @@
           document.getElementById('input-section').style.display = 'block';
           document.getElementById('scanner-container').style.display = 'none';
           document.getElementById('result-display').style.display = 'none';
+          showSummary();
           console.log("Scanner stopped.");
         }).catch(error => {
           console.error("Failed to stop scanner. ", error);
-          // If stop fails (e.g. wasn't running), force UI reset
           document.getElementById('input-section').style.display = 'block';
           document.getElementById('scanner-container').style.display = 'none';
+          showSummary();
         });
       }
     }
