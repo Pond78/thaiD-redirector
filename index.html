@@ -165,9 +165,13 @@
 
     <div id="input-section">
       <p style="margin-top: 0; text-align: left; font-size: 0.9rem; color: #666;">
-        1. วางโค้ด HTML ที่มีตารางใบสั่งลงในช่องด้านล่าง<br>
+        1. อัปโหลดไฟล์ .html/.mhtml หรือวางโค้ดในช่อง<br>
         2. กดปุ่ม "ดึงข้อมูล & เริ่มสแกน"
       </p>
+      <div style="margin-bottom: 10px; text-align: left;">
+        <input type="file" id="fileInput" accept=".html,.htm,.mhtml"
+          style="display: block; width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 5px;">
+      </div>
       <textarea id="htmlInput" placeholder="วางโค้ด HTML <tbody>...</tbody> ที่นี่"></textarea>
       <button onclick="startScanner()">ดึงข้อมูล & เปิดกล้อง</button>
       <div id="data-status" style="margin-top: 10px; font-weight: bold;"></div>
@@ -220,6 +224,31 @@
       }
     }
 
+    function decodeQuotedPrintable(str) {
+      // Remove soft line breaks (=\r\n, =\n, =\r)
+      let decoded = str.replace(/=\r?\n/g, '');
+      // Decode hex sequences (=3D -> =)
+      decoded = decoded.replace(/=([0-9A-F]{2})/yi, function (match, hex) {
+        return String.fromCharCode(parseInt(hex, 16));
+      });
+      return decoded;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const content = e.target.result;
+        // Put content in textarea for visibility (optional) and process
+        document.getElementById('htmlInput').value = content;
+        // Auto-parse
+        parseOrderNumbers(content);
+      };
+      reader.readAsText(file);
+    });
+
     function speakPaid() {
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance("จ่ายแล้ว");
@@ -250,11 +279,20 @@
       }
     }
 
-    function parseOrderNumbers() {
-      const input = document.getElementById('htmlInput').value.trim();
+    function parseOrderNumbers(sourceText = null) {
+      let input = sourceText;
       if (!input) {
-        alert("กรุณาวางโค้ด HTML ก่อน");
+        input = document.getElementById('htmlInput').value.trim();
+      }
+
+      if (!input) {
+        alert("กรุณาวางโค้ด HTML หรืออัปโหลดไฟล์ก่อน");
         return false;
+      }
+
+      // Check if MHTML/Quoted-Printable and decode
+      if (input.includes('MIME-Version:') || input.includes('Content-Transfer-Encoding: quoted-printable') || input.includes('=3D')) {
+        input = decodeQuotedPrintable(input);
       }
 
       // Create a dummy element to parse HTML safely
